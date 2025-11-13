@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>科学探偵～不可解な異音～</title>
+<style>
+body {
+  font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
+  background: #f8f9fa;
+  color: #222;
+  margin: 0;
+  padding: 20px;
+}
+h1 {
+  color: #b22222;
+  text-align: center;
+}
+.container {
+  max-width: 750px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+.question {
+  display: none;
+  padding: 10px 0;
+}
+.visible {
+  display: block;
+}
+input[type="text"] {
+  width: 90%;
+  padding: 8px;
+  margin-top: 8px;
+  font-size: 1em;
+}
+button {
+  margin-top: 10px;
+  padding: 10px 18px;
+  font-size: 1em;
+  border: none;
+  border-radius: 8px;
+  background: #007bff;
+  color: white;
+  cursor: pointer;
+}
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+.hint, .next-action, .info {
+  padding: 10px;
+  margin-top: 10px;
+}
+.hint {
+  background: #f1f1f1;
+  border-left: 4px solid #999;
+}
+.next-action {
+  background: #e9f3ff;
+  border: 2px solid #007bff;
+  border-radius: 6px;
+}
+.info {
+  background: #ffeaea;
+  border: 2px solid #ff0000;
+  border-radius: 6px;
+}
+.nav {
+  margin-bottom: 10px;
+  text-align: center;
+}
+.nav button {
+  background: #6c757d;
+  color: #fff;
+  margin: 3px;
+}
+.nav button.active {
+  background: #007bff;
+}
+.truth {
+  background: #fff3cd;
+  border: 2px solid #ffcc00;
+  padding: 10px;
+  margin-top: 15px;
+  border-radius: 6px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>科学探偵～不可解な異音～</h1>
+  <p><strong>遊び方：</strong><br>
+  各問題に答えを入力してください。<br>
+  正解なら「次にやること」が表示される。<br>
+  前の問題に戻って確認することもできる。<br>
+  解答は「ひらがな」または「漢字」で入力できる。</p>
+
+  <div class="nav" id="nav"></div>
+  <div id="questions"></div>
+</div>
+
+<script>
+const quizData = [
+  { 
+    q: "問題1．導き出された答えは何か？", 
+    answer: ["めいせい", "明聖"], 
+    hint: "容疑者の名前はなんだったかな",
+    next: "問題2に挑戦する",
+    info: "明聖高校の教員みたいだ"
+  },
+  { 
+    q: "問題2．見つけた答えは何か？", 
+    answer: ["ちいかわ"], 
+    hint: "この動物には規則性がありそうだ・・？",
+    next: "1階で少し早い気分のポスターを探そう",
+    info: "理科の教員ではないみたいだ"
+  },
+  { 
+    q: "問題3．このポスターの指示には、どこに向かえと書いてある？", 
+    answer: ["花壇", "かだん"], 
+    hint: "ポスターには不可解な文字列が・・・？",
+    next: "花壇といえば、花が咲いている場所がこの学校にもある気がする・・・",
+    info: "ちいかわが好きなようだ"
+  },
+  { 
+    q: "問題4．花壇で得た、あいことばはなにか？", 
+    answer: ["火災報知器", "かさいほうちき"], 
+    hint: "この指令の文字に違和感があるな・・？",
+    next: "犯人に気づかれないように丁寧に指紋を採取しに行こう！",
+    info: "犯人は職員室にいるみたいだ"
+  },
+  { 
+    q: "問題5．犯人はだれか（苗字のみ）", 
+    answer: ["鈴木", "すずき"], 
+    hint: "犯人の指紋検出を行い容疑者一覧の指紋と照らし合わせて、犯人を特定して下さい。",
+    next: "",
+    info: ""
+  }
+];
+
+const truthText = `
+<div class="truth">
+<h3>事件の真相</h3>
+<p>今回の事件の真相は犯人の趣味であった。<br>
+犯人は、火災報知機を押すスリルを味わいたく、誰もいない校舎に忍び込んだ。<br>
+ボタンを押すときに手袋をつけるのを忘れたことに気づき、その後は震えて授業を行っていたそう。<br>
+事件を調査していると、過去にも他の施設で火災報知機を押していた常習性が確認された。<br>
+今後もボタンを連打していきたいと告げていた・・・・</p>
+<p><strong>犯人にはちいかわグッズの没収と、毎月のお小遣い1万円の刑が実行された。</strong></p>
+</div>`;
+
+let current = 0;
+const saved = JSON.parse(localStorage.getItem("investigationProgress")) || {};
+const questionsDiv = document.getElementById("questions");
+const navDiv = document.getElementById("nav");
+
+function saveProgress() {
+  localStorage.setItem("investigationProgress", JSON.stringify(saved));
+}
+
+function renderNav() {
+  navDiv.innerHTML = "";
+  quizData.forEach((_, i) => {
+    const btn = document.createElement("button");
+    btn.textContent = `問題${i+1}`;
+    if (i === current) btn.classList.add("active");
+    btn.disabled = (i > 0 && !saved[i-1]);
+    btn.onclick = () => showQuestion(i);
+    navDiv.appendChild(btn);
+  });
+}
+
+function showQuestion(index) {
+  current = index;
+  questionsDiv.innerHTML = "";
+  renderNav();
+
+  const q = quizData[index];
+  const div = document.createElement("div");
+  div.className = "question visible";
+
+  div.innerHTML = `
+    <h2>${q.q}</h2>
+    <input type="text" id="answerInput" placeholder="ここに入力">
+    <button id="checkBtn">答える</button>
+    <button id="hintBtn">ヒント</button>
+    <div id="message"></div>
+    <div id="nextBtnArea"></div>
+  `;
+  questionsDiv.appendChild(div);
+
+  const answerInput = div.querySelector("#answerInput");
+  const message = div.querySelector("#message");
+  const nextArea = div.querySelector("#nextBtnArea");
+  const checkBtn = div.querySelector("#checkBtn");
+  const hintBtn = div.querySelector("#hintBtn");
+
+  // 保存された回答を復元
+  if (saved[index]) {
+    answerInput.value = saved[index].input;
+    message.innerHTML = `
+      ${q.info ? `<div class="info">犯人の情報：${q.info}</div>` : ""}
+      ${q.next && index < quizData.length-1 ? `<div class="next-action">次にやること：${q.next}</div>` : ""}
+    `;
+    if (index < quizData.length-1) {
+      nextArea.innerHTML = `<button id="nextBtn">次の問題へ進む</button>`;
+      nextArea.querySelector("#nextBtn").onclick = () => showQuestion(index+1);
+    } else {
+      nextArea.innerHTML = `<button id="truthBtn">真相を暴く</button>`;
+      nextArea.querySelector("#truthBtn").onclick = () => {
+        nextArea.innerHTML = truthText;
+      };
+    }
+  }
+
+  hintBtn.onclick = () => {
+    message.innerHTML = `<div class="hint">ヒント：${q.hint}</div>`;
+  };
+
+  checkBtn.onclick = () => {
+    const ans = answerInput.value.trim().replace(/\s+/g,"");
+    const isCorrect = q.answer.includes(ans);
+    if (isCorrect) {
+      saved[index] = { input: ans, correct: true };
+      saveProgress();
+      message.innerHTML = `
+        ${q.info ? `<div class="info">犯人の情報：${q.info}</div>` : ""}
+        ${q.next && index < quizData.length-1 ? `<div class="next-action">次にやること：${q.next}</div>` : ""}
+      `;
+      if (index < quizData.length-1) {
+        nextArea.innerHTML = `<button id="nextBtn">次の問題へ進む</button>`;
+        nextArea.querySelector("#nextBtn").onclick = () => showQuestion(index+1);
+      } else {
+        nextArea.innerHTML = `<button id="truthBtn">真相を暴く</button>`;
+        nextArea.querySelector("#truthBtn").onclick = () => {
+          nextArea.innerHTML = truthText;
+        };
+      }
+      renderNav();
+    } else {
+      message.innerHTML = `<div class="hint">ヒント：${q.hint}</div>`;
+    }
+  };
+}
+
+showQuestion(current);
+</script>
+</body>
